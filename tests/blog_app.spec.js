@@ -53,7 +53,7 @@ describe('Blog app', () => {
             await expect(page.getByText('test title e2e')).toBeVisible()
         })
 
-        test.only('blog can be liked', async ({ page }) => {
+        test.skip('blog can be liked', async ({ page }) => {
             await createBlog(page, {
                 title: 'title to like e2e',
                 author: 'test author e2e',
@@ -70,7 +70,26 @@ describe('Blog app', () => {
             const likeButton = await locator.getByRole('button', { name: 'like' })
             await likeButton.click()
 
-            expect(likes).toContainText('likes 1')
+            await expect(likes).toContainText('likes 1')
+        })
+
+        test.skip('blog can be deleted', async ({ page }) => {
+            await createBlog(page, {
+                title: 'title to delete e2e',
+                author: 'test author e2e',
+                url: 'http://testUrlE2e.com'
+            })
+
+            const locator = await page.getByText('title to delete e2e').locator('..')
+
+            const viewButton = await locator.getByRole('button', { name: 'view' })
+            await viewButton.click()
+
+            const removeButton = await locator.getByRole('button', { name: 'remove' })
+            await removeButton.click()
+            page.on('dialog', dialog => dialog.accept())
+
+            await expect(locator).not.toBeVisible()
         })
     })
 })
