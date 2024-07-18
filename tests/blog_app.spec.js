@@ -1,22 +1,76 @@
-const { test, expect } = require('@playwright/test')
-const { describe, beforeEach } = require('node:test')
+const { test, expect, describe, beforeEach } = require('@playwright/test')
+const { loginWith, createBlog } = require('./helper')
 
 describe('Blog app', () => {
-    beforeEach(async ({ page }) => {
-        await page.goto('http://localhost:5173')
+    beforeEach(async ({ page, request }) => {
+        await request.post('/api/testing/reset')
+        await request.post('/api/users', {
+            data: {
+                name: 'Matti Luukkainen',
+                username: 'mluukkai',
+                password: 'salainen'
+            }
+        })
+        
+        await page.goto('/')
+    })
+
+    describe('Log in', () => {
+        test('front page can be opened', async ({ page }) => {
+            const locator = await page.getByText('blogs')
+            await expect(locator).toBeVisible()
+        })
+    
+        test('login form can be opened', async ({ page }) => {
+            await loginWith(page, 'mluukkai', 'salainen')
+    
+            await expect(page.getByText('Matti Luukkainen')).toBeVisible()
+        })
+
+        test('failed if password is wrong', async ({ page }) => {
+            await loginWith(page, 'mluukkai', 'wrongPass123')
+    
+            const errorDiv = await page.locator('.error')
+            await expect(errorDiv).toContainText('wrong credentials')
+            await expect(errorDiv).toHaveCSS('color', 'rgb(255, 0, 0)')
+
+            await expect(page.getByText('Matti Luukkainen')).not.toBeVisible()
+        })
     })
     
-    test('front page can be opened', async ({ page }) => {
-        const locator = await page.getByText('blogs')
-        await expect(locator).toBeVisible()
-    })
+    describe('When logged in', () => {
+        beforeEach(async ({ page }) => {
+            await loginWith(page, 'mluukkai', 'salainen')
+        })
 
-    test('login form can be opened', async ({ page }) => {
-        await page.getByRole('button', { name: 'log in' }).click()
-        await page.getByTestId('username').fill('mluukkai')
-        await page.getByTestId('password').fill('salainen')
-        await page.getByRole('button', { name: 'login' }).click()
+        test('a new blog can be created', async ({ page }) => {
+            await createBlog(page, {
+                title: 'test title e2e',
+                author: 'test author e2e',
+                url: 'http://testUrlE2e.com'
+            })
 
-        await expect(page.getByText('Matti Luukkainen')).toBeVisible()
+            await expect(page.getByText('test title e2e')).toBeVisible()
+        })
+
+        test.only('blog can be liked', async ({ page }) => {
+            await createBlog(page, {
+                title: 'title to like e2e',
+                author: 'test author e2e',
+                url: 'http://testUrlE2e.com'
+            })
+
+            const locator = await page.getByText('title to like e2e').locator('..')
+
+            const viewButton = await locator.getByRole('button', { name: 'view' })
+            await viewButton.click()
+
+            const likes = await locator.getByText('likes 0')
+
+            const likeButton = await locator.getByRole('button', { name: 'like' })
+            await likeButton.click()
+
+            expect(likes).toContainText('likes 1')
+        })
     })
 })
